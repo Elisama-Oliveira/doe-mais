@@ -1,6 +1,5 @@
 fastapi==0.115.12
 uvicorn
 requests
-flet==0.28.3
 Pillow
 psycopg2-binary
