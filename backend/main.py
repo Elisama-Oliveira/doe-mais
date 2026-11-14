@@ -203,7 +203,7 @@ def cadastro(d: Cadastro):
     if ler1("SELECT id FROM usuarios WHERE usuario=?", (usuario,)):
         raise HTTPException(400, "Esse usuário já existe.")
     tel = re.sub(r"\D", "", d.telefone)
-    if not 10 <= len(tel) <= 13:
+    if tel and not 10 <= len(tel) <= 13:
         raise HTTPException(400, "Informe um telefone válido, com DDD.")
     criar_usuario(usuario, d.senha, tel)
     return {"ok": True}
