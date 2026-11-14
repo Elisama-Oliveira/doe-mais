@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Doe+</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1d2330;--mut:#667085;--pri:#2e7d5b;--bd:#e1e4ea;--me:#d9f0e4;--soft:#e8f5ee}
+@media(prefers-color-scheme:dark){:root{--bg:#14171c;--card:#1e232b;--tx:#e8ebf0;--mut:#9aa3b2;--pri:#46b383;--bd:#2f3642;--me:#24503c;--soft:#1f3a2e}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:16px system-ui,sans-serif;padding-bottom:84px}
+main{max-width:640px;margin:0 auto;padding:16px}
+h2{margin:8px 0 14px}
+input,select,textarea,button,.btn{width:100%;font:inherit;padding:11px;margin:5px 0;border-radius:10px;border:1px solid var(--bd);background:var(--card);color:var(--tx);display:block;text-align:center}
+button,.btn.p{background:var(--pri);color:#fff;border:0;cursor:pointer;font-weight:600}
+button.sec,.btn{background:var(--card);color:var(--tx);border:1px solid var(--bd);cursor:pointer}
+.row{display:flex;gap:8px}.row button{width:auto}
+.card{display:flex;gap:10px;background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px;margin:10px 0}
+.g{flex:1;min-width:0}.g p{margin:6px 0}
+small,.m{color:var(--mut);display:block}
+.btns{display:flex;gap:6px;flex-wrap:wrap}.btns button,.btns a{width:auto;padding:8px 12px;font-size:14px;margin:0}
+a.b{background:var(--pri);color:#fff;border-radius:10px;text-decoration:none;display:inline-block}
+.mini{width:56px;height:56px;object-fit:cover;border-radius:8px}
+.prev{width:160px;height:160px;object-fit:cover;border-radius:10px}.big{width:100%;max-width:320px;border-radius:10px}
+#ms{max-height:50vh;overflow:auto}
+.bal{max-width:80%;padding:8px 10px;border-radius:12px;margin:6px 0;background:var(--card);border:1px solid var(--bd)}
+.bal.me{margin-left:auto;background:var(--me)}.bal small{font-size:11px}
+.perfil{text-align:center}.av{width:110px;height:110px;border-radius:50%;background:var(--pri);color:#fff;font-size:48px;font-weight:700;display:flex;align-items:center;justify-content:center;margin:10px auto}
+.nome{font-size:32px;font-weight:700;margin:6px 0;word-break:break-word}
+.tag{display:inline-block;background:var(--soft);color:var(--pri);padding:4px 14px;border-radius:20px;font-size:13px}
+.nums{display:flex;gap:8px;margin:18px 0}.nums div{flex:1;background:var(--soft);border-radius:12px;padding:12px 4px;font-size:12px}.nums b{display:block;font-size:26px;color:var(--pri)}
+nav{position:fixed;bottom:0;left:0;right:0;display:flex;background:var(--card);border-top:1px solid var(--bd)}
+nav button{background:none;color:var(--mut);border:0;border-radius:0;margin:0;font-size:12px}nav button.on{color:var(--pri)}
+#aviso{position:fixed;top:12px;left:50%;transform:translateX(-50%);background:#222;color:#fff;padding:10px 16px;border-radius:10px;z-index:9;max-width:90%}
+</style>
+</head>
+<body>
+<main id="app"></main>
+<div id="aviso" hidden></div>
+<nav id="nav" hidden>
+  <button onclick="go('/inicio')">🏠<br>Início</button>
+  <button onclick="go('/doar')">➕<br>Doar</button>
+  <button onclick="go('/pedidos')">📥<br><span id="tp">Pedidos</span></button>
+  <button onclick="go('/perfil')">👤<br>Perfil</button>
+</nav>
+<script>
+// Endereço do servidor. Teste local (servidor abrindo este site): deixe "".
+// No GitHub Pages: "https://doe-mais-servidor.onrender.com" (sem barra no final).
+const API="";
+const CATS=['Roupas','Alimentos','Móveis','Eletrônicos','Livros','Outros'];
+const OPTS=CATS.map(c=>`<option>${c}</option>`).join('');
+let S=JSON.parse(localStorage.getItem('s')||'{}'),lista=[],timer=null,foto='',nm=0,np=0;
+const $=s=>document.querySelector(s),app=$('#app');
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const wa=t=>{t=String(t).replace(/\D/g,'');if(t.length<=11)t='55'+t;return'https://wa.me/'+t};
+const aviso=m=>{const e=$('#aviso');e.textContent=m;e.hidden=false;clearTimeout(aviso.t);aviso.t=setTimeout(()=>e.hidden=true,3500)};
+async function api(m,p,b){
+  let r;
+  try{r=await fetch(API+p,{method:m,headers:{'Content-Type':'application/json',Authorization:S.token||''},body:b?JSON.stringify(b):undefined})}
+  catch(e){throw new Error('Sem conexão com o servidor.')}
+  const d=await r.json().catch(()=>({}));
+  if(r.status===401&&S.token){sair();throw new Error('Faça login novamente.')}
+  if(!r.ok)throw new Error(typeof d.detail==='string'?d.detail:'Dados inválidos.');
+  return d;
+}
+const acao=fn=>fn().catch(e=>aviso(e.message));
+const go=r=>{location.hash=r};
+const ir=r=>location.hash==='#'+r?rota():go(r);
+function tela(titulo,html,aba=-1){
+  clearInterval(timer);
+  $('#nav').hidden=!S.token;
+  [...$('#nav').children].forEach((b,k)=>b.classList.toggle('on',k===aba));
+  app.innerHTML=`<h2>${titulo}</h2>`+html;
+}
+function rota(){
+  const h=location.hash.slice(1)||'/inicio',p=h.split('/');
+  if(h==='/cadastro')return telaCadastro();
+  if(!S.token)return telaLogin();
+  if(p[1]==='chat')return telaChat(+p[2]);
+  if(p[1]==='item')return telaDetalhes(+p[2]);
+  if(h==='/admin'&&S.admin)return telaAdmin();
+  ({'/doar':telaDoar,'/pedidos':telaPedidos,'/perfil':telaPerfil}[h]||telaInicio)();
+}
+addEventListener('hashchange',rota);
+
+/* ---------- login e cadastro ---------- */
+function telaLogin(){
+  tela('Doe+',`<input id="u" placeholder="Usuário"><input id="s" type="password" placeholder="Senha" onkeydown="if(event.key==='Enter')entrar()">
+  <button onclick="entrar()">Entrar</button><button class="sec" onclick="go('/cadastro')">Criar conta</button>`);
+}
+const entrar=()=>acao(async()=>{
+  const d=await api('POST','/login',{usuario:$('#u').value,senha:$('#s').value});
+  S={token:d.token,usuario:d.usuario,admin:d.admin};localStorage.setItem('s',JSON.stringify(S));nm=np=0;ir('/inicio');
+});
+function sair(){S={};localStorage.removeItem('s');ir('/login')}
+function telaCadastro(){
+  tela('Criar conta',`<input id="u" placeholder="Usuário">
+  <input id="s" type="password" placeholder="Senha"><input id="s2" type="password" placeholder="Confirmar senha">
+  <button onclick="cadastrar()">Cadastrar</button><button class="sec" onclick="go('/login')">Voltar</button>`);
+}
+const cadastrar=()=>acao(async()=>{
+  if($('#s').value!==$('#s2').value)throw new Error('As senhas não conferem.');
+  await api('POST','/cadastro',{usuario:$('#u').value,senha:$('#s').value});
+  aviso('Conta criada! Faça login.');go('/login');
+});
+
+/* ---------- início e detalhes ---------- */
+const mini=(id,tem)=>tem?`<img class="mini" src="${API}/itens/${id}/foto" alt="">`:'';
+function telaInicio(){
+  tela('Itens para doação',`<div class="row"><input id="b" placeholder="Buscar item" onkeydown="if(event.key==='Enter')carregar()"><button onclick="carregar()">🔍</button></div>
+  <select id="c" onchange="carregar()"><option value="">Todas as categorias</option>${OPTS}</select><div id="l"></div>`,0);
+  carregar();
+}
+const carregar=()=>acao(async()=>{
+  lista=await api('GET',`/itens?busca=${encodeURIComponent($('#b').value)}&categoria=${encodeURIComponent($('#c').value)}`);
+  $('#l').innerHTML=lista.map(i=>`<div class="card" onclick="go('/item/${i.id}')">${mini(i.id,i.tem_foto)}<div class="g"><b>${esc(i.titulo)}</b>
+    <small>${esc(i.categoria)} • ${i.doador===S.usuario?'seu item':'doador: '+esc(i.doador)}${i.status==='reservado'?' • reservado':''}</small></div></div>`).join('')||'<p class="m">Nenhum item disponível.</p>';
+});
+const telaDetalhes=id=>acao(async()=>{
+  let i=lista.find(x=>x.id===id);
+  if(!i){lista=await api('GET','/itens');i=lista.find(x=>x.id===id)}
+  if(!i)return go('/inicio');
+  const meu=i.doador===S.usuario;
+  tela(esc(i.titulo),`${i.tem_foto?`<img class="big" src="${API}/itens/${i.id}/foto" alt="">`:''}
+  <p class="m">${esc(i.categoria)} • doador: ${esc(i.doador)}</p><p>${esc(i.descricao)||'Sem descrição.'}</p>
+  ${meu?`<p>Este é o seu item.${i.status==='reservado'?' Já está reservado: veja em Pedidos.':''}</p>`
+   :`<textarea id="m" placeholder="Mensagem para o doador (opcional)"></textarea><button onclick="solicitar(${i.id})">Solicitar item</button>`}
+  ${S.admin?`<button class="sec" onclick="remover(${i.id},'/inicio')">Remover item (admin)</button>`:''}
+  <button class="sec" onclick="go('/inicio')">Voltar</button>`,0);
+});
+const solicitar=id=>acao(async()=>{await api('POST',`/itens/${id}/solicitar`,{mensagem:$('#m').value});aviso('Solicitação enviada!');go('/pedidos')});
+const remover=(id,volta)=>acao(async()=>{await api('DELETE','/itens/'+id);ir(volta)});
+
+/* ---------- doar (com foto) ---------- */
+function lerFoto(f){return new Promise((ok,err)=>{
+  const i=new Image();
+  i.onload=()=>{const k=Math.min(1,900/Math.max(i.width,i.height)),c=document.createElement('canvas');
+    c.width=i.width*k;c.height=i.height*k;c.getContext('2d').drawImage(i,0,0,c.width,c.height);ok(c.toDataURL('image/jpeg',.8).split(',')[1])};
+  i.onerror=()=>err(new Error('Não consegui ler essa imagem. Use uma foto JPG ou PNG.'));
+  i.src=URL.createObjectURL(f);
+})}
+function telaDoar(){
+  foto='';
+  tela('Doar um item',`<input id="t" placeholder="O que você quer doar?"><textarea id="d" placeholder="Descrição"></textarea><select id="k">${OPTS}</select>
+  <label class="btn">📷 Escolher foto<input type="file" accept="image/*" hidden onchange="escolher(this)"></label>
+  <div id="pv" class="m">Nenhuma foto escolhida</div><button onclick="publicar()">Publicar</button><h3>Meus itens</h3><div id="mi"></div>`,1);
+  acao(async()=>{
+    const d=await api('GET','/meus-itens');
+    $('#mi').innerHTML=d.map(i=>`<div class="card">${mini(i.id,i.tem_foto)}<div class="g"><b>${esc(i.titulo)}</b><small>${esc(i.categoria)} • ${esc(i.status)}</small>
+      <div class="btns"><button class="sec" onclick="remover(${i.id},'/doar')">Excluir</button></div></div></div>`).join('')||'<p class="m">Você ainda não cadastrou itens.</p>';
+  });
+}
+const escolher=inp=>acao(async()=>{
+  const f=inp.files[0];if(!f)return;
+  $('#pv').textContent='Preparando foto...';foto=await lerFoto(f);
+  $('#pv').innerHTML=`<img class="prev" src="data:image/jpeg;base64,${foto}" alt="">`;
+});
+const publicar=()=>acao(async()=>{
+  if(!$('#t').value.trim())throw new Error('Informe o título.');
+  await api('POST','/itens',{titulo:$('#t').value,descricao:$('#d').value,categoria:$('#k').value,foto_b64:foto});
+  aviso('Item publicado!');telaDoar();
+});
+
+/* ---------- pedidos ---------- */
+const post=p=>acao(async()=>{await api('POST',p);telaPedidos()});
+const chatBtn=(s,nl)=>{const n=nl[s.id]||0;return`<button class="sec" onclick="go('/chat/${s.id}')">Chat${n?` (${n} nova${n>1?'s':''})`:''}</button>`};
+const zap=s=>s.telefone?`<a class="b" target="_blank" rel="noopener" href="${wa(s.telefone)}">WhatsApp</a>`:'';
+const telaPedidos=()=>acao(async()=>{
+  const [r,f,nv]=await Promise.all([api('GET','/pedidos-recebidos'),api('GET','/minhas-solicitacoes'),api('GET','/novidades')]);
+  const nl=nv.por_chat;
+  tela('Pedidos',`<h3>Pedidos recebidos</h3>`+(r.map(s=>`<div class="card">${mini(s.item_id,s.tem_foto)}<div class="g"><b>${esc(s.titulo)}</b>
+    <small>Pedido de ${esc(s.receptor)} • ${esc(s.status)}</small><p>${esc(s.mensagem)}</p><div class="btns">${chatBtn(s,nl)}
+    ${s.status==='pendente'?`<button onclick="post('/solicitacoes/${s.id}/aceitar')">Aceitar</button><button class="sec" onclick="post('/solicitacoes/${s.id}/recusar')">Recusar</button>`:''}
+    ${s.status==='aceita'?`${zap(s)}<button onclick="post('/itens/${s.item_id}/concluir')">Doação concluída</button><button class="sec" onclick="post('/solicitacoes/${s.id}/cancelar')">Cancelar doação</button>`:''}
+    </div></div></div>`).join('')||'<p class="m">Nenhum pedido recebido.</p>')
+  +`<h3>Minhas solicitações</h3>`+(f.map(s=>`<div class="card">${mini(s.item_id,s.tem_foto)}<div class="g"><b>${esc(s.titulo)}</b>
+    <small>Doador: ${esc(s.doador)} • ${esc(s.status)}</small><div class="btns">${chatBtn(s,nl)}
+    ${s.status==='aceita'?`${zap(s)}<button class="sec" onclick="post('/solicitacoes/${s.id}/cancelar')">Desistir</button>`:''}
+    </div></div></div>`).join('')||'<p class="m">Você ainda não solicitou nenhum item.</p>'),2);
+});
+
+/* ---------- chat ---------- */
+function telaChat(id){
+  tela('Chat',`<div id="h" class="m"></div><div id="ms"></div><div class="row"><input id="tx" placeholder="Mensagem" onkeydown="if(event.key==='Enter')enviar(${id})">
+  <button onclick="enviar(${id})">➤</button></div><button class="sec" onclick="go('/pedidos')">Voltar</button>`,2);
+  lerChat(id);timer=setInterval(()=>lerChat(id),3000);
+}
+const lerChat=id=>api('GET','/chat/'+id).then(d=>{
+  if(!$('#ms'))return;
+  $('#h').textContent='Conversa com '+d.outro;
+  $('#ms').innerHTML=d.mensagens.map(m=>`<div class="bal ${m.minha?'me':''}">${esc(m.texto)}<small>${esc(m.criado.slice(11,16))}</small></div>`).join('');
+  $('#ms').scrollTop=$('#ms').scrollHeight;
+}).catch(()=>{});
+const enviar=id=>acao(async()=>{
+  const v=$('#tx').value.trim();if(!v)return;
+  await api('POST','/chat/'+id,{texto:v});$('#tx').value='';lerChat(id);
+});
+
+/* ---------- perfil e administrador ---------- */
+const telaPerfil=()=>acao(async()=>{
+  const [m,r,f]=await Promise.all([api('GET','/meus-itens'),api('GET','/pedidos-recebidos'),api('GET','/minhas-solicitacoes')]);
+  tela('Perfil',`<div class="perfil"><div class="av">${esc((S.usuario||'?')[0].toUpperCase())}</div><div class="nome">${esc(S.usuario)}</div>
+  <span class="tag">${S.admin?'Administrador':'Membro do Doe+'}</span>
+  <div class="nums"><div><b>${m.length}</b>Itens para doar</div><div><b>${r.length}</b>Pedidos recebidos</div><div><b>${f.length}</b>Minhas solicitações</div></div>
+  ${S.admin?`<button onclick="go('/admin')">Painel do administrador</button>`:''}<button class="sec" onclick="sair()">Sair</button></div>`,3);
+});
+const telaAdmin=()=>acao(async()=>{
+  const u=(await api('GET','/admin/usuarios')).filter(x=>!x.admin);
+  tela('Administrador',(u.map(x=>`<div class="card"><div class="g"><b>${esc(x.usuario)}</b><small>${x.bloqueado?'BLOQUEADO':'Ativo'}</small>
+    <div class="btns"><button class="sec" onclick="adm('POST','/admin/usuarios/${x.id}/bloquear')">${x.bloqueado?'Desbloquear':'Bloquear'}</button>
+    <button class="sec" onclick="adm('DELETE','/admin/usuarios/${x.id}')">Excluir</button></div></div></div>`).join('')||'<p class="m">Nenhum usuário cadastrado.</p>')
+    +'<button class="sec" onclick="go(\'/perfil\')">Voltar</button>',3);
+});
+const adm=(m,p)=>acao(async()=>{await api(m,p);telaAdmin()});
+
+/* ---------- avisos de mensagens e pedidos novos ---------- */
+setInterval(async()=>{
+  if(!S.token)return;
+  try{
+    const d=await api('GET','/novidades'),aberto=(location.hash.match(/^#\/chat\/(\d+)/)||[])[1];
+    const msgs=d.mensagens-(d.por_chat[aberto]||0),tot=msgs+d.pedidos;
+    $('#tp').textContent=tot?`Pedidos (${tot})`:'Pedidos';
+    if(msgs>nm)aviso('Você recebeu uma nova mensagem!');else if(d.pedidos>np)aviso('Você recebeu um novo pedido de doação!');
+    nm=msgs;np=d.pedidos;
+  }catch(e){}
+},4000);
+rota();
+</script>
+</body>
+</html>
